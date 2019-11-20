@@ -52,6 +52,16 @@ def write2Document (url, jobj, next):
                 if isinstance(value,list) and len(value):
                     if isinstance(value[0],dict) and value[0].has_key('@odata.id'):
                         next.add(value[0]['@odata.id'])
+        elif key == 'ResourceBlocks':
+            for members in value:
+                if isinstance(value,list) and len(value):
+                    if isinstance(value[0],dict) and value[0].has_key('@odata.id'):
+                        next.add(value[0]['@odata.id'])
+        elif type(value) is dict:
+            for members in value.values():
+                if type(members) is str and members.find("/redfish/v1") > -1:
+                    next.add(members)
+
                         #print(value)
                 #break
         if isinstance(value, dict):
@@ -86,12 +96,12 @@ def flatten (mol, next):
             if isinstance(i,list):
                 flatten(i,next)
             elif isinstance(i, dict):
-                print('list value is ', i)
+                #print('list value is ', i)
                 flatten(i,next)
 
     elif isinstance(mol, dict):
         for k, v in mol.items():
-            if k.find('@odata.id') > -1:
+            if k.find('@odata.id') > -1 or (type(v) is str and v.find('/redfish/v1') > -1):
                 #print('#########   ',v , '   ########')
                 next.add(v)
             elif isinstance(v, dict):
@@ -110,7 +120,7 @@ def go (root, url):
         return
     elif url.find ('redfish') == -1:
         return
-    print(url)
+    #print(url)
     visited.add(url)
     uri=root+url
     try:
@@ -122,15 +132,20 @@ def go (root, url):
         for (k, v) in element.items():
             #print(k , ' : ', v)
             if k.find('@odata.id') > -1:
-                next.add(k)
+                next.add(v)
             elif isinstance(v,list) or isinstance(v,dict):
                 flatten(v, next)
 
-        print('=============   ',uri, '    =============')
-        print(json.dumps(element, indent=4, sort_keys=True))
-        if write2Document(uri, element,next):
+        #print('=============   ',uri, '    =============')
+        #print(json.dumps(element, indent=4, sort_keys=True))
+        if url not in st.keys():
+            print ('***   add in ', url)
+            #print element
             st[url] = element
             sts[url] = url.split('/')
+        if write2Document(uri, element,next):
+            print('$$$$   ',url)
+            
         for urll in next:
             #print(urll)
             go (root, urll)
@@ -164,6 +179,7 @@ def readDoc(spec):
         found = False 
         for i in range(len(table.rows)):
             for j in range(len(table.columns)):
+                #print('####   ',table.cell(i,j).text)
                 if table.cell(i,j).text.find ('Type URI') > -1:
                     print('####   ',table.cell(i,j+1).text)
                     dts[table.cell(i,j+1).text] = table.cell(i,j+1).text.split('/')
@@ -209,9 +225,11 @@ def find (target):
 
 def main():
     print("pls enter your server ip ...")
-    ip=sys.stdin.readline().strip('\n')
+#    ip=sys.stdin.readline().strip('\n')
     print("pls enter your spec file path and file name ...")
-    fp=sys.stdin.readline().strip('\n')
+#    fp=sys.stdin.readline().strip('\n')
+    ip='10.10.12.11'
+    fp='/home/ben/Desktop/redfish-spec-generator/BMC_Redfish_RTP1.7-API_v0.1.0.docx'
     spec = docx.Document(fp)
     readDoc(spec)
     filenamelist = fp.split('/')
@@ -244,32 +262,73 @@ def main():
                 enter = True 
             #iterate this table then save it property as map
         if enter:
+            print ( key,"   :    " , dkey )
             property=set()
             print(type(dt[dkey]))
             for row in dt[dkey].rows:
-                if len(row.cells): 
-                    property.add(row.cells[0].text)
-                    print(row.cells[0].text)
-            print(type(st[key]))
+                if len(row.cells):
+                    word = str(row.cells[0].text)
+                    pos = word.find('(') 
+                    if pos != -1:
+                        word = word[:pos]
+                    """pos = word.find('%') 
+                    if pos != -1:
+                        word = word[:pos]"""
+                    word = word.replace(' ','')
+                    property.add(word.lower())
+                    print('====     ',word)
+            # below is for when spec has no such property then we will append (x) behind that property
+            """print(type(st[key]))
+            for p in property:
+                if p not in st[key].keys():
+                    for row in dt[dkey].rows:
+                        if len(row.cells) and row.cells[0].text == p: 
+                            run = row.cells[0].paragraphs[0].add_run('(X)')
+                            #print row.cells[0].text 
+                            run.font.color.rgb = RGBColor(0x42, 0x24, 0xE9)
+                            break"""
+
             for properties in st[key].keys():
-                if properties not in property:
-                    print(dt[dkey].cell(-1,-1).paragraphs[0])
+                print ('#####    ', properties)
+                p = properties.lower().replace(' ','')
+                position = p.find('@') 
+                if position > 0:
+                    p = p[:position]
+                if p not in property:
+                    #print(dt[dkey].cell(-1,-1).paragraphs[0])
                     para = dt[dkey].cell(-1,-1).paragraphs[0]
                     r = dt[dkey].add_row()
                     #r.cells[0].text = properties
                     #r.cells[1].text = 'benchin'
-                    r0 = r.cells[1].paragraphs[0].add_run('benchin')
                     r1 = r.cells[0].paragraphs[0].add_run(properties)
-                    r0.font.size = r1.font.size = Pt(8)
+                    if type(properties) is list:
+                        r0 = r.cells[1].paragraphs[0].add_run('Object')
+                        r0.font.size = r1.font.size = Pt(8)
+                    elif type(properties) is int:
+                        r0 = r.cells[1].paragraphs[0].add_run('Integer')
+                        r0.font.size = r1.font.size = Pt(8)
+                    elif type(properties) is dict:
+                        r0 = r.cells[1].paragraphs[0].add_run('Object')
+                        r0.font.size = r1.font.size = Pt(8)
+                    elif type(properties) is bool:
+                        r0 = r.cells[1].paragraphs[0].add_run('Boolean')
+                        r0.font.size = r1.font.size = Pt(8)
+                    else:
+                        r0 = r.cells[1].paragraphs[0].add_run('String')
+                        r0.font.size = r1.font.size = Pt(8)
+                    r1 = r.cells[2].paragraphs[0].add_run('quanta')
+
                     if len(para.runs):
                         r0.style = para.runs[0].style
-                    print(properties, '  not exists')
-                else:
+                    print('@@@@@   ', properties, '  not exists')
+                """else:
                     for row in dt[dkey].rows:
                         if len(row.cells) and row.cells[0].text == properties: 
                             run = row.cells[0].paragraphs[0].add_run('%%')
+                            #print row.cells[0].text 
+                            #property.add(row.cells[0].text)
                             run.font.color.rgb = RGBColor(0x42, 0x24, 0xE9)
-                            break
+                            break"""
 
         else:
             mdoc.add_paragraph(key, style = 'ListBullet')
