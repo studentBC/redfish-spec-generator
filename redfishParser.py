@@ -190,6 +190,22 @@ def readDoc(spec):
             if found:
                 break
 
+def cleanTypeURI(spec):
+    for table in spec.tables:
+        for i in range(len(table.rows)):
+            if table.cell(i,0).text.find ('Type URI') > -1:
+                row = table.rows[i]
+                remove_row(table, row)
+                break
+
+
+def remove_row(table, row):
+    tbl = table._tbl
+    tr = row._tr
+    tbl.remove(tr)
+
+
+
 def iter_block_items(parent):
     if isinstance(parent, docx.document.Document):
         parent_elm = parent.element.body
@@ -225,11 +241,11 @@ def find (target):
 
 def main():
     print("pls enter your server ip ...")
-#    ip=sys.stdin.readline().strip('\n')
+    ip=sys.stdin.readline().strip('\n')
     print("pls enter your spec file path and file name ...")
-#    fp=sys.stdin.readline().strip('\n')
-    ip='10.10.12.11'
-    fp='/home/ben/Desktop/redfish-spec-generator/BMC_Redfish_RTP1.7-API_v0.1.0.docx'
+    fp=sys.stdin.readline().strip('\n')
+#    ip='10.10.12.11'
+#    fp='/home/ben/Desktop/redfish-spec-generator/BMC_Redfish_RTP1.7-API_v0.1.0.docx'
     spec = docx.Document(fp)
     readDoc(spec)
     filenamelist = fp.split('/')
@@ -344,6 +360,7 @@ def main():
     newfile = filepath+"modifiedSpec.docx"
     generateS = filepath+"generateSpec.docx"
     print(missuri, newfile, generateS)
+    cleanTypeURI(spec)
     document.save(generateS)
     mdoc.save(missuri)
     spec.save(newfile)
