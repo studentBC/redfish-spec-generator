@@ -27,6 +27,8 @@ dt={} #document table
 dts={} #document table split uri into list
 st={} #server BMC table
 sts={} #server BMC table split uri into list
+botype = set() # BMC odata.type
+dotype={} #document odata.type map the key will be ServiceRoot and the value will be ServiceRoot.v1_0_2.ServiceRoot
 
 
 def write2Document (url, jobj, next):
@@ -133,6 +135,11 @@ def go (root, url):
             #print(k , ' : ', v)
             if k.find('@odata.id') > -1:
                 next.add(v)
+            elif k.find('@odata.type') > -1:
+                temp = v[1:]
+                botype.add(temp)
+                words = temp.split('.')
+                dotype[words[0]] = temp 
             elif isinstance(v,list) or isinstance(v,dict):
                 flatten(v, next)
 
@@ -361,6 +368,20 @@ def main():
     generateS = filepath+"generateSpec.docx"
     print(missuri, newfile, generateS)
     cleanTypeURI(spec)
+
+    for table in spec.tables:
+        if table.cell(0,2).text.find ('Redfish Schema') > -1:
+            for i in range(1, len(table.rows)):
+                if  table.cell(i,2).text not in botype:
+                    print ('###### cant find schema    ', table.cell(i,2).text)
+                    substr = table.cell(i,2).text.split('.')
+                    if substr[0] in dotype:
+                        run = table.cell(i,2).paragraphs[0].add_run('(X)')
+                        run = table.cell(i,2).paragraphs[0].add_run(dotype[substr[0]])
+                        #print row.cells[0].text 
+                        #run.font.color.rgb = RGBColor(0x42, 0x24, 0xE9)
+                        
+
     document.save(generateS)
     mdoc.save(missuri)
     spec.save(newfile)
