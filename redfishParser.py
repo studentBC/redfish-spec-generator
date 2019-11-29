@@ -63,6 +63,12 @@ def write2Document (url, jobj, next):
             for members in value.values():
                 if type(members) is str and members.find("/redfish/v1") > -1:
                     next.add(members)
+        elif type(value) is list:
+            for i in value:
+                if type(i) is dict:
+                    for members in i.values():
+                        if type(members) is str and members.find("/redfish/v1") > -1:
+                            next.add(members)
 
                         #print(value)
                 #break
@@ -100,6 +106,11 @@ def flatten (mol, next):
             elif isinstance(i, dict):
                 #print('list value is ', i)
                 flatten(i,next)
+            elif type(i) is str:
+                if i.find('/redfish/v1') > -1:
+                    #print('#########   ',v , '   ########')
+                    next.add(i)
+
 
     elif isinstance(mol, dict):
         for k, v in mol.items():
@@ -122,7 +133,7 @@ def go (root, url):
         return
     elif url.find ('redfish') == -1:
         return
-    #print(url)
+    print(url)
     visited.add(url)
     uri=root+url
     try:
@@ -246,13 +257,40 @@ def find (target):
 
     return "not here"
 
+def checkTOT(jsonElemnt, documentTable):
+     
+    for (k, v) in jsonElemnt.items():
+        target = k.lower().replace(' ','')
+        found = False
+        for row in documentTable.rows:
+            target = row.cells[0].text.lower().replace(' ','')
+            if k.lower().replace(' ','') == target:
+                found = True
+                lastrow = len(row.cells)-1
+                if isinstance(v,dict) and len(row.cells[lastrow].tables) and (row.cells[lastrow].tables[0].rows[0].cells[0].text.find('Name') > -1 or row.cells[lastrow].tables[0].rows[0].cells[0].text.find('Enum') > -1):
+                    checkTOT (v , row.cells[lastrow].tables[0])
+                break
+        if not found:
+            r = documentTable.add_row()
+            #r.cells[0].text = properties
+            #r.cells[1].text = 'benchin'
+            print ('%%%%    add table of table property  ',k)
+            r1 = r.cells[0].paragraphs[0].add_run(k)
+            r1 = r.cells[1].paragraphs[0].add_run('mawkish')
+            r1.font.size = Pt(8)
+            if isinstance(v,dict):
+                lastrow = len(r)-1
+                nt = r1.cells[lastrow].add_table(rows = 1,cols = 4)
+                checkTOT(v ,nt)
+
+
 def main():
     print("pls enter your server ip ...")
     ip=sys.stdin.readline().strip('\n')
     print("pls enter your spec file path and file name ...")
     fp=sys.stdin.readline().strip('\n')
-#    ip='10.10.12.11'
-#    fp='/home/ben/Desktop/redfish-spec-generator/BMC_Redfish_RTP1.7-API_v0.1.0.docx'
+    #ip='10.10.12.166'
+    #fp='/home/ben/Desktop/redfish-spec-generator/BMC_Redfish_RTP1.7-API-Template_v0.2.0.docx'
     spec = docx.Document(fp)
     readDoc(spec)
     filenamelist = fp.split('/')
@@ -287,7 +325,8 @@ def main():
         if enter:
             print ( key,"   :    " , dkey )
             property=set()
-            print(type(dt[dkey]))
+            #print(type(dt[dkey]))
+            tot = {}
             for row in dt[dkey].rows:
                 if len(row.cells):
                     word = str(row.cells[0].text)
@@ -297,9 +336,15 @@ def main():
                     """pos = word.find('%') 
                     if pos != -1:
                         word = word[:pos]"""
-                    word = word.replace(' ','')
-                    property.add(word.lower())
-                    print('====     ',word)
+                    word = word.replace(' ','').lower()
+                    property.add(word)
+                    #print('====     ',word)
+                    last = len(row.cells)-1
+                    #print('len of tot is  ', len(row.cells[last].tables))
+                    if len(row.cells[last].tables) and (row.cells[last].tables[0].rows[0].cells[0].text.find('Name') > -1 or row.cells[last].tables[0].rows[0].cells[0].text.find('Enum') > -1):
+                        print ('tot key is:  ' , word )
+                        tot[word] = row.cells[last].tables[0]
+
             # below is for when spec has no such property then we will append (x) behind that property
             """print(type(st[key]))
             for p in property:
@@ -344,6 +389,13 @@ def main():
                     if len(para.runs):
                         r0.style = para.runs[0].style
                     print('@@@@@   ', properties, '  not exists')
+                else:
+                    if p in tot.keys():
+                        # the function to get miss properties in table of table ...
+                        print('@@$$$   ', properties, '   exists and it is dict !!!')
+                        checkTOT(st[key][properties], tot[p])
+                    #else:
+                        #print('p not in properties is ', p)
                 """else:
                     for row in dt[dkey].rows:
                         if len(row.cells) and row.cells[0].text == properties: 
@@ -368,12 +420,12 @@ def main():
     generateS = filepath+"generateSpec.docx"
     print(missuri, newfile, generateS)
     cleanTypeURI(spec)
-
+    # check redfish schema table version
     for table in spec.tables:
         if table.cell(0,2).text.find ('Redfish Schema') > -1:
             for i in range(1, len(table.rows)):
                 if  table.cell(i,2).text not in botype:
-                    print ('###### cant find schema    ', table.cell(i,2).text)
+                    #print ('###### cant find schema    ', table.cell(i,2).text)
                     substr = table.cell(i,2).text.split('.')
                     if substr[0] in dotype:
                         run = table.cell(i,2).paragraphs[0].add_run('(X)')
