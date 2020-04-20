@@ -9,11 +9,10 @@ in every response property table for parser to check properties exists or not
 
 2. check your spec whether there API support list in your spec if so its format should be match to like below:
 
-|-----------------------------------------------------------------------------------------|
 |Resource         | Resource URI                 | Redfish Schema                         |
 |-----------------------------------------------------------------------------------------|
 |TelemetryService | /redfish/v1/TelemetryService |TelemetryService.v1_1_1.TelemetryService|
-|-----------------------------------------------------------------------------------------|
+
 
 As you complished it, parser will check if every resource URI match to its schema on the spec
 
