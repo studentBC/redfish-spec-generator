@@ -2,9 +2,9 @@
 parsing BMC server and compare to redfish spec with odata.id then try to modify spec
 # how to use it ?
 1. prepare your own spec and add a row of 
-|------------------------------------------------------|
+
 |Type URI | /redfish/v1/AccountService/Accounts/benchin|
-|------------------------------------------------------|
+
 in every response property table for parser to check properties exists or not
 
 2. check your spec whether there API support list in your spec if so its format should be match to like below:
